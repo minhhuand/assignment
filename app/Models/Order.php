@@ -15,4 +15,12 @@ class Order extends Model
     {
         return $this->hasMany(OrderDetail::class);
     }
+
+    public function user()
+    {
+        // Giả sử bảng orders có cột user_id là khóa ngoại để liên kết với bảng users
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // Định nghĩa mối quan hệ giữa Order và OrderDetai
 }

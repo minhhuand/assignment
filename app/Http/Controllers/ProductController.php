@@ -7,12 +7,11 @@ use App\Models\Product;
 use App\Models\Order;
 use App\Models\OrderDetail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+
     public function index()
     {
         $products = Product::paginate(10);
@@ -20,13 +19,6 @@ class ProductController extends Controller
     }
 
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
 
     public function store(Request $request)
     {
@@ -41,8 +33,6 @@ class ProductController extends Controller
         $product->name = $request->name;
         $product->description = $request->description;
         $product->price = $request->price;
-
-        // Xử lý file ảnh
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('images', 'public');
             $product->image = $imagePath;
@@ -52,26 +42,14 @@ class ProductController extends Controller
 
         return response()->json(['message' => 'Product added successfully', 'product' => $product], 201);
     }
-    /**
-     * Display the specified resource.
-     */
+   
     public function show($id)
     {
         $product = Product::findOrFail($id);
         return response()->json($product);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
+   
     public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
@@ -103,19 +81,16 @@ class ProductController extends Controller
 
         $product->save();
 
-        // Lấy lại sản phẩm từ cơ sở dữ liệu
-        $product = Product::findOrFail($id);
 
+        $product = Product::findOrFail($id);
         return response()->json(['message' => 'Cập nhật thành công', 'product' => $product]);
     }
 
 
-    // Xóa sản phẩm
+
     public function destroy($id)
     {
         $product = Product::findOrFail($id);
-
-        // Xóa ảnh nếu có
         if ($product->image) {
             Storage::disk('public')->delete($product->image);
         }
@@ -125,15 +100,6 @@ class ProductController extends Controller
         return response()->json(['message' => 'Product deleted successfully']);
     }
 
-
-    public function topProducts()
-    {
-        $products = Product::with('orderDetail')->get();
-        return response()->json([
-            'data' => $products,
-            'success' => true,
-        ]);
-    }
 
     public function addProductToOrder(Request $request, string $id)
     {
@@ -186,63 +152,9 @@ class ProductController extends Controller
         ]);
     }
 
-    public function getAllOrders()
-    {
-        // Truy vấn để lấy tất cả các đơn hàng và chi tiết từng đơn hàng
-        $orders = Order::with(['orderDetails.product'])->where('status', 1)->get();
-
-        $orderList = $orders->map(function ($order) {
-            $totalOrderPrice = $order->orderDetails->sum(function ($detail) {
-                return $detail->quantity * $detail->product->price;
-            });
-
-            return [
-                'order_id' => $order->id,
-                'total_order' => $totalOrderPrice,
-                'order_details' => $order->orderDetails->map(function ($detail) {
-                    return [
-                        'product_name' => $detail->product->name,
-                        'quantity' => $detail->quantity,
-                        'unit_price' => $detail->product->price,
-                        'total_price' => $detail->quantity * $detail->product->price,
-                    ];
-                }),
-            ];
-        });
-
-        // Trả về danh sách đơn hàng đã xử lý
-        return response()->json($orderList);
-    }
-
-    public function placeOrder()
-    {
-        $user_id = auth()->id();
-
-        $order = Order::with(['orderDetails.product'])
-            ->where('user_id', $user_id)
-            ->where('status', 0)
-            ->first();
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy đơn hàng nào chưa hoàn thành cho người dùng này',
-            ]);
-        }
-
-        $order->status = 1;
-        $order->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Đặt hàng thành công',
-            'order' => $order,
-        ]);
-    }
-
-
+  
     public function getTotalSoldProductCounts()
     {
-
         $soldProducts = OrderDetail::with('product')
             ->selectRaw('product_id, sum(quantity) as total_sold')
             ->whereHas('order', function ($query) {
@@ -257,4 +169,57 @@ class ProductController extends Controller
             'data' => $soldProducts,
         ]);
     }
+
+    public function productList(Request $request)
+    {
+        // Bước 1: Lấy danh sách tất cả sản phẩm cùng với tổng số lượng đã bán của mỗi sản phẩm
+        $query = Product::withCount(['orderDetails as total_quantity_sold' => function ($query) {
+            $query->select(DB::raw("SUM(quantity)"));
+        }]);
+    
+        // Bước 2: Nếu có yêu cầu tìm kiếm sản phẩm (theo tên hoặc mô tả)
+        if ($request->input('search')) {
+            $search = $request->input('search');
+            $query = $query->where('name', 'LIKE', '%' . $search . '%')
+                           ->orWhere('description', 'LIKE', '%' . $search . '%');
+        }
+    
+        // Bước 3: Lọc sản phẩm bán nhiều nhất
+        if ($request->input('most_sold') === 'true') {
+            $query = $query->orderBy('total_quantity_sold', 'desc');
+        }
+    
+        // Bước 4: Lọc sản phẩm bán ít nhất
+        if ($request->input('least_sold') === 'true') {
+            $query = $query->orderBy('total_quantity_sold', 'asc');
+        }
+    
+        // Bước 5: Lấy số sản phẩm mỗi trang và số trang hiện tại từ request (nếu không có thì dùng giá trị mặc định)
+        $perPage = 10; // Số sản phẩm trên mỗi trang
+        $page = $request->input('page', 1); // Trang hiện tại (mặc định là trang 1)
+    
+        // Bước 6: Phân trang với phương thức paginate
+        $products = $query->paginate($perPage, ['*'], 'page', $page);
+    
+        // Bước 7: Chuẩn bị dữ liệu sản phẩm để trả về
+        $productList = $products->map(function ($product) {
+            return [
+                'name' => $product->name, // Tên sản phẩm
+                'price' => $product->price, // Giá sản phẩm
+                'image' => $product->image, // Hình ảnh sản phẩm
+                'description' => $product->description, // Mô tả sản phẩm
+                'total_quantity_sold' => $product->total_quantity_sold ?? 0, // Số lượng đã bán (nếu chưa có đơn hàng thì là 0)
+            ];
+        });
+    
+        // Bước 8: Trả về danh sách sản phẩm đã chuẩn bị cùng với thông tin phân trang
+        return response()->json([
+            'data' => $productList,
+            'current_page' => $products->currentPage(), // Trang hiện tại
+            'last_page' => $products->lastPage(), // Tổng số trang
+            'total' => $products->total(), // Tổng số sản phẩm
+        ]);
+    }
+    
+    
 }

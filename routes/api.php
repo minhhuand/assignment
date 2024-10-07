@@ -26,17 +26,18 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
 
-    Route::post('order/', [ProductController::class, 'placeOrder']);
-
+    
     Route::resource('users', UserController::class);
     Route::resource('products', ProductController::class);
-
     Route::get('add-product/{id}', [ProductController::class, 'addProductToOrder']);
-    Route::get('/orders', [ProductController::class, 'getAllOrders']);
     Route::get('/total', [ProductController::class, 'getTotalSoldProductCounts']);
-
+    Route::get('/product-list', [ProductController::class, 'productList']);
+    
+    Route::post('/order', [OrderController::class, 'placeOrder']);
+    Route::get('/orders', [OrderController::class, 'getAllOrders']);
     Route::get('/cart', [OrderController::class, 'cart']);
+    Route::get('/user-purchases', [OrderController::class, 'userPurchases']);
+    Route::get('/orders-user', [OrderController::class, 'getOrdersByUser']);
+    Route::delete('/delete-order/{id}', [OrderController::class, 'deleteOrder']);
+
 });
-// Route::get('/top-products', [ProductController::class, 'topProducts']);
-// Route::get('/products', [ProductController::class, 'show']);
-//Route::get('/orders', [ProductController::class, 'getAllOrders']);

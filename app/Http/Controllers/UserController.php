@@ -4,40 +4,29 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-
+use App\Policies\UserPolicy;
+use Illuminate\Auth\Access\AuthorizationException;
 class UserController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+   
     public function index()
     {
-        $users = User::orderBy('username', 'ASC')->paginate(10);
-        return response()->json([
-            'data' => $users,
-            'success' => true,
-        ]);
+        try {
+            $this->authorize('viewAny', User::class);
+            $users = User::orderBy('username', 'ASC')->paginate(10);
+            return response()->json([
+                'data' => $users,
+                'success' => true,
+            ]);
+        } catch (AuthorizationException $e) {
+            return response()->json([
+                'message' => 'Bạn không có quyền truy cập vào danh sách người dùng này.',
+                'success' => false,
+            ], 403);
+        }
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
+    
     public function show(string $id)
     {
         $user = User::find($id);
@@ -47,18 +36,7 @@ class UserController extends Controller
             'message' => 'Get user successfully',
         ]);
     }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
+    
     public function update(Request $request, string $id)
     {
         $admin = $request->user();
@@ -79,10 +57,10 @@ class UserController extends Controller
             'email.unique' => 'Email này đã được sử dụng.',
         ];
 
-        // Thực hiện xác thực với các thông điệp lỗi tùy chỉnh
+       
         $request->validate($rules, $messages);
 
-        // Kiểm tra quyền truy cập
+
         if ($admin->is_admin != 1 && $admin->id != $id) {
             return response()->json([
                 'success' => false,
@@ -103,16 +81,10 @@ class UserController extends Controller
 
 
 
-
-
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id, Request $request)
     {
         $admin = $request->user();
         if ($admin->is_admin != 1) {
-            //Chỉ được phép xóa user chính mình
             if ($admin->id != $id) {
                 return response()->json([
                     'success' => false,
@@ -127,17 +99,6 @@ class UserController extends Controller
             'message' => 'Delete user successfully',
             'data' => $request->user(),
             'id' => $id
-        ]);
-    }
-
-    public function orders(Request $request)
-    {
-        $user = $request->user();
-        $user->orders = $user->orders()->with('details')->select('id', 'total')->orderBy('total', 'DESC')->get();
-        return response()->json([
-            'data' => $user,
-            'success' => true,
-            'message' => 'Get order successfully',
         ]);
     }
 }
