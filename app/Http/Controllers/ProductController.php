@@ -42,14 +42,14 @@ class ProductController extends Controller
 
         return response()->json(['message' => 'Product added successfully', 'product' => $product], 201);
     }
-   
+
     public function show($id)
     {
         $product = Product::findOrFail($id);
         return response()->json($product);
     }
 
-   
+
     public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
@@ -152,7 +152,7 @@ class ProductController extends Controller
         ]);
     }
 
-  
+
     public function getTotalSoldProductCounts()
     {
         $soldProducts = OrderDetail::with('product')
@@ -174,44 +174,48 @@ class ProductController extends Controller
     {
         // Bước 1: Lấy danh sách tất cả sản phẩm cùng với tổng số lượng đã bán của mỗi sản phẩm
         $query = Product::withCount(['orderDetails as total_quantity_sold' => function ($query) {
-            $query->select(DB::raw("SUM(quantity)"));
+            $query->select(DB::raw("SUM(quantity)"))->whereHas('order', function ($q) {
+                $q->where('status', 1); // Chỉ tính đơn hàng có status = 1
+            });
         }]);
-    
+
         // Bước 2: Nếu có yêu cầu tìm kiếm sản phẩm (theo tên hoặc mô tả)
         if ($request->input('search')) {
             $search = $request->input('search');
-            $query = $query->where('name', 'LIKE', '%' . $search . '%')
-                           ->orWhere('description', 'LIKE', '%' . $search . '%');
+            $query = $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', '%' . $search . '%')
+                    ->orWhere('description', 'LIKE', '%' . $search . '%');
+            });
         }
-    
+
         // Bước 3: Lọc sản phẩm bán nhiều nhất
         if ($request->input('most_sold') === 'true') {
             $query = $query->orderBy('total_quantity_sold', 'desc');
         }
-    
+
         // Bước 4: Lọc sản phẩm bán ít nhất
         if ($request->input('least_sold') === 'true') {
             $query = $query->orderBy('total_quantity_sold', 'asc');
         }
-    
+
         // Bước 5: Lấy số sản phẩm mỗi trang và số trang hiện tại từ request (nếu không có thì dùng giá trị mặc định)
         $perPage = 10; // Số sản phẩm trên mỗi trang
         $page = $request->input('page', 1); // Trang hiện tại (mặc định là trang 1)
-    
+
         // Bước 6: Phân trang với phương thức paginate
         $products = $query->paginate($perPage, ['*'], 'page', $page);
-    
+
         // Bước 7: Chuẩn bị dữ liệu sản phẩm để trả về
         $productList = $products->map(function ($product) {
             return [
                 'name' => $product->name, // Tên sản phẩm
-                'price' => $product->price, // Giá sản phẩm
-                'image' => $product->image, // Hình ảnh sản phẩm
+                'price' => $product->price, // Giá sản phẩm, định dạng với 2 chữ số thập phân
+                'image' => $product->image, // Hình ảnh sản phẩm, sử dụng asset để tạo đường dẫn đầy đủ
                 'description' => $product->description, // Mô tả sản phẩm
                 'total_quantity_sold' => $product->total_quantity_sold ?? 0, // Số lượng đã bán (nếu chưa có đơn hàng thì là 0)
             ];
         });
-    
+
         // Bước 8: Trả về danh sách sản phẩm đã chuẩn bị cùng với thông tin phân trang
         return response()->json([
             'data' => $productList,
@@ -220,6 +224,4 @@ class ProductController extends Controller
             'total' => $products->total(), // Tổng số sản phẩm
         ]);
     }
-    
-    
 }

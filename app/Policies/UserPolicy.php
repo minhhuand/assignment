@@ -10,10 +10,7 @@ class UserPolicy
     /**
      * Determine whether the user can view any models.
      */
-    public function viewAny(User $user)
-    {
-        return in_array($user->role_id, [1, 2]);
-    }
+    public function viewAny(User $user) {}
 
     /**
      * Determine whether the user can view the model.
@@ -28,7 +25,7 @@ class UserPolicy
      */
     public function create(User $user)
     {
-        //
+        return in_array($user->role_id, [1]);
     }
 
     /**
@@ -36,7 +33,7 @@ class UserPolicy
      */
     public function update(User $user, User $model)
     {
-        //
+        return in_array($user->role_id, [1, 2, 3]) || $user->id === $model->id;
     }
 
     /**
@@ -44,7 +41,7 @@ class UserPolicy
      */
     public function delete(User $user, User $model)
     {
-        //
+        return in_array($user->role_id, [1, 2]) || $user->id === $model->id;
     }
 
     /**

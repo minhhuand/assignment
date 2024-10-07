@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class AuthController extends Controller
 {
@@ -22,8 +23,10 @@ class AuthController extends Controller
                 'success' => true,
                 'message' => 'Đăng nhập thành công',
                 'token' => $token,
-                'id_admin' => $request->user()->is_admin,
+                'role_id' => $request->user()->role_id,
                 'user' => $request->user()->username,
+                'id_user' => $request->user()->id,
+
             ]);
         }
 
@@ -35,46 +38,55 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        $admin = $request->user();
-        if ($admin->is_admin != 1) {
+        try {
+            $this->authorize('create', User::class);
+            $validator = Validator::make($request->all(), [
+                'first_name' => 'required',
+                'last_name' => 'required',
+                'username' => 'required|unique:users',
+                'password' => 'required',
+                'email' => 'required|email|unique:users',
+            ], [
+                'first_name.required' => 'Tên là bắt buộc.',
+                'last_name.required' => 'Họ là bắt buộc.',
+                'username.required' => 'Tên đăng nhập là bắt buộc.',
+                'username.unique' => 'Tên đăng nhập đã được sử dụng.',
+                'password.required' => 'Mật khẩu là bắt buộc.',
+                'email.required' => 'Email là bắt buộc.',
+                'email.email' => 'Email không hợp lệ.',
+                'email.unique' => 'Email đã được sử dụng.',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            // Tạo người dùng mới
+            $user = new User();
+            $user->fill($request->all());
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Thêm người dùng thành công',
+                'user' => $user,
+            ]);
+        } catch (AuthorizationException $e) {
+            // Trả về lỗi 403 nếu không có quyền
             return response()->json([
                 'success' => false,
-                'message' => 'Bạn không có quyền',
-            ], 401);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'first_name' => 'required',
-            'last_name' => 'required',
-            'username' => 'required|unique:users',
-            'password' => 'required',
-            'email' => 'required|email|unique:users',
-        ], [
-            'first_name.required' => 'Tên là bắt buộc.',
-            'last_name.required' => 'Họ là bắt buộc.',
-            'username.required' => 'Tên đăng nhập là bắt buộc.',
-            'username.unique' => 'Tên đăng nhập đã được sử dụng.',
-            'password.required' => 'Mật khẩu là bắt buộc.',
-            'email.required' => 'Email là bắt buộc.',
-            'email.email' => 'Email không hợp lệ.',
-            'email.unique' => 'Email đã được sử dụng.',
-        ]);
-
-        if ($validator->fails()) {
+                'message' => 'Bạn không có quyền tạo người dùng mới.',
+            ], 403);
+        } catch (\Exception $e) {
+            // Xử lý các lỗi khác, nếu có
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+                'message' => 'Đã xảy ra lỗi trong quá trình thêm người dùng.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $user = new User();
-        $user->fill($request->all());
-        $user->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Thêm người dùng thành công',
-            'user' => $user,
-        ]);
     }
 }
