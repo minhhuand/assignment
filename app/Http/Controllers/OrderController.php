@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Models\OrderDetail;
 
 class OrderController extends Controller
 {
@@ -19,24 +20,35 @@ class OrderController extends Controller
             $totalOrderPrice = $order->orderDetails->sum(function ($detail) {
                 return $detail->quantity * $detail->product->price;
             });
-
             return [
                 'order_id' => $order->id,
                 'total_order' => $totalOrderPrice,
+                'sum_quantity' =>$order->orderDetails->sum('quantity'),
                 'order_details' => $order->orderDetails->map(function ($detail) {
                     return [
+                         'id_product' => $detail->product->id,
                         'product_name' => $detail->product->name,
                         'quantity' => $detail->quantity,
                         'image' => $detail->product->image,
                         'unit_price' => $detail->product->price,
                         'total_price' => $detail->quantity * $detail->product->price,
                     ];
+                
+
                 }),
+              
             ];
         });
 
 
         return response()->json($orderList);
+    }
+
+    public function deleteProductCart( $order_id, $product_id){
+        $orderDetail = OrderDetail::where('order_id', $order_id)
+        ->where('product_id', $product_id)
+        ->first();
+        $orderDetail->delete();
     }
 
     public function placeOrder()
@@ -266,4 +278,39 @@ class OrderController extends Controller
             ],
         ]);
     }
+
+    public function updateProductCart(Request $request, $order_id, $product_id) {
+        $quantity = $request->input('quantity');
+    
+        // Tìm OrderDetail theo order_id và product_id
+        $orderDetail = OrderDetail::where('order_id', $order_id)
+                                    ->where('product_id', $product_id)
+                                    ->first();
+    
+        // Nếu tìm thấy OrderDetail
+        if ($orderDetail) {
+            if ($quantity == 0) {
+                // Nếu số lượng là 0, xóa sản phẩm khỏi giỏ hàng
+                $orderDetail->delete();
+                // Kiểm tra xem có còn sản phẩm nào liên kết với order_id này không
+                $remainingOrderDetails = OrderDetail::where('order_id', $order_id)->count();
+    
+                // Nếu không còn sản phẩm nào, xóa luôn Order đó
+                if ($remainingOrderDetails == 0) {
+                    Order::find($order_id)->delete();
+                    return response()->json(['message' => 'Sản phẩm đã được xóa khỏi giỏ hàng và đơn hàng đã bị xóa.'], 200);
+                }
+    
+                return response()->json(['message' => 'Sản phẩm đã được xóa khỏi giỏ hàng.'], 200);
+            } else {
+                // Cập nhật số lượng sản phẩm
+                $orderDetail->quantity = $quantity;
+                $orderDetail->save();
+                return response()->json(['message' => 'Cập nhật số lượng sản phẩm thành công.'], 200);
+            }
+        } else {
+            return response()->json(['message' => 'Không tìm thấy sản phẩm trong giỏ hàng.'], 404);
+        }
+    }
+    
 }

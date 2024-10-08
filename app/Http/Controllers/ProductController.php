@@ -103,55 +103,65 @@ class ProductController extends Controller
 
     public function addProductToOrder(Request $request, string $id)
     {
+        // Lấy người dùng hiện tại từ request
         $user = $request->user();
-
+    
+        // Lấy số lượng sản phẩm từ request
+        $quantity = $request->input('quantity', 1); // Mặc định là 1 nếu không có input 'quantity'
+    
         // Tìm đơn hàng của người dùng với status = 0
         $order = Order::where('user_id', $user->id)->where('status', 0)->first();
         $product = Product::find($id);
-
+    
         // Nếu không có đơn hàng với status = 0
         if (!$order) {
             // Kiểm tra xem có đơn hàng nào với status = 0 hay không
             $existingOrders = Order::where('user_id', $user->id)->where('status', 1)->get();
-            $Orders = Order::all();
-            // Nếu tất cả các đơn hàng đều có status = 1, tạo đơn hàng mới
-            if ($existingOrders->count() > 0 || $existingOrders->count() == 0) {
-                $order = new Order();
-                $order->user_id = auth()->id();
-                $order->total = $product->price;
-                $order->status = 0;
-                $order->save();
-
-                $orderDetail = new OrderDetail();
-                $orderDetail->order_id = $order->id;
-                $orderDetail->product_id = $id;
-                $orderDetail->quantity = 1;
-                $orderDetail->save();
-            }
+    
+            // Nếu không có đơn hàng nào với status = 0, tạo đơn hàng mới
+            $order = new Order();
+            $order->user_id = auth()->id();
+            $order->total = $product->price * $quantity;
+            $order->status = 0;
+            $order->save();
+    
+            // Thêm sản phẩm vào chi tiết đơn hàng
+            $orderDetail = new OrderDetail();
+            $orderDetail->order_id = $order->id;
+            $orderDetail->product_id = $id;
+            $orderDetail->quantity = $quantity;
+            $orderDetail->save();
         } else {
+            // Kiểm tra xem sản phẩm đã tồn tại trong đơn hàng hay chưa
             $orderDetail = OrderDetail::where('order_id', $order->id)->where('product_id', $id)->first();
-
+    
             if ($orderDetail) {
-
-                $orderDetail->quantity += 1;
+                // Cập nhật số lượng nếu sản phẩm đã tồn tại
+                $orderDetail->quantity += $quantity;
                 $orderDetail->save();
             } else {
+                // Thêm sản phẩm mới vào chi tiết đơn hàng nếu chưa tồn tại
                 $orderDetail = new OrderDetail();
                 $orderDetail->order_id = $order->id;
                 $orderDetail->product_id = $id;
-                $orderDetail->quantity = 1;
+                $orderDetail->quantity = $quantity;
                 $orderDetail->save();
             }
-            $order->total =  $order->total +  $product->price;
+            // Cập nhật tổng tiền đơn hàng
+            $order->total += $product->price * $quantity;
             $order->save();
         }
-
+    
+        // Trả về phản hồi JSON với thông tin đơn hàng và chi tiết sản phẩm
         return response()->json([
             'data' => $order,
             'success' => true,
         ]);
     }
 
+ 
+    
+    
 
     public function getTotalSoldProductCounts()
     {

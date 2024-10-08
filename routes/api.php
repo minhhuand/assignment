@@ -29,7 +29,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     
     Route::resource('users', UserController::class);
     Route::resource('products', ProductController::class);
-    Route::get('add-product/{id}', [ProductController::class, 'addProductToOrder']);
+    Route::post('add-product/{id}', [ProductController::class, 'addProductToOrder']);
     Route::get('/total', [ProductController::class, 'getTotalSoldProductCounts']);
     Route::get('/product-list', [ProductController::class, 'productList']);
     
@@ -39,5 +39,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user-purchases', [OrderController::class, 'userPurchases']);
     Route::get('/orders-user', [OrderController::class, 'getOrdersByUser']);
     Route::delete('/delete-order/{id}', [OrderController::class, 'deleteOrder']);
+    Route::post('/update-cart/{order_id}/{product_id}', [OrderController::class, 'updateProductCart']);
+    Route::delete('/delete-product-cart/{order_id}/{product_id}', [OrderController::class, 'deleteProductCart']);
+
+
 
 });
