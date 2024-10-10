@@ -13,10 +13,10 @@ class AuthController extends Controller
     public function login(Request $request)
     {
 
-        $username = $request->username;
+        $email = $request->email;
         $password = $request->password;
 
-        $status = Auth::attempt(['username' => $username, 'password' => $password]);
+        $status = Auth::attempt(['email' => $email, 'password' => $password]);
         if ($status) {
             $token = $request->user()->createToken('auth_token')->plainTextToken;
             return response()->json([
@@ -24,7 +24,7 @@ class AuthController extends Controller
                 'message' => 'Đăng nhập thành công',
                 'token' => $token,
                 'role_id' => $request->user()->role_id,
-                'user' => $request->user()->username,
+                'user' => $request->user()->email,
                 'id_user' => $request->user()->id,
 
             ]);
@@ -89,4 +89,24 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+
+   
+    
+    public function logout(Request $request)
+    {
+        // Xóa tất cả token của người dùng
+        $request->user()->tokens()->delete();
+    
+        // Đăng xuất người dùng
+        Auth::guard('web')->logout();
+    
+        return response()->json(['message' => 'Đăng xuất thành công.']);
+    }
+
+    public function getUser(Request $request)
+    {
+        return $request->user(); // Trả về thông tin người dùng hiện tại
+    }
+    
 }

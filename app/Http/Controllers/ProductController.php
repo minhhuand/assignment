@@ -52,39 +52,39 @@ class ProductController extends Controller
 
     public function update(Request $request, $id)
     {
+     
+        // Tìm sản phẩm theo ID
         $product = Product::findOrFail($id);
+        
+        // Validate request
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|required|numeric',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
-
-        if ($request->has('name')) {
-            $product->name = $request->name;
-        }
-        if ($request->has('description')) {
-            $product->description = $request->description;
-        }
-        if ($request->has('price')) {
-            $product->price = $request->price;
-        }
-
+    
+        $product->fill($request->only(['name', 'description', 'price']));
+    
         // Xử lý file ảnh
         if ($request->hasFile('image')) {
+            // Xóa ảnh cũ nếu có
             if ($product->image) {
                 Storage::disk('public')->delete($product->image);
             }
+
             $imagePath = $request->file('image')->store('images', 'public');
             $product->image = $imagePath;
         }
-
+    
+        // Lưu thông tin sản phẩm đã cập nhật
         $product->save();
-
-
-        $product = Product::findOrFail($id);
+    
+        // Trả về phản hồi JSON
         return response()->json(['message' => 'Cập nhật thành công', 'product' => $product]);
     }
+    
+  
 
 
 
