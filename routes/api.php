@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\OrderController;
+use  App\Http\Controllers\ProductUpdateController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -28,13 +29,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    
+
     Route::resource('users', UserController::class);
     Route::resource('products', ProductController::class);
+    // Route::post('/product/{id}', [ProductUpdateController::class, 'update']);
     Route::post('add-product/{id}', [ProductController::class, 'addProductToOrder']);
     Route::get('/total', [ProductController::class, 'getTotalSoldProductCounts']);
     Route::get('/product-list', [ProductController::class, 'productList']);
-    
+
     Route::post('/order', [OrderController::class, 'placeOrder']);
     Route::get('/orders', [OrderController::class, 'getAllOrders']);
     Route::get('/cart', [OrderController::class, 'cart']);
@@ -43,13 +45,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/delete-order/{id}', [OrderController::class, 'deleteOrder']);
     Route::post('/update-cart/{order_id}/{product_id}', [OrderController::class, 'updateProductCart']);
     Route::delete('/delete-product-cart/{order_id}/{product_id}', [OrderController::class, 'deleteProductCart']);
-
-
-
 });
-Route::resource('users', UserController::class);
 
-//Route::resource('products', ProductController::class);
+
 
 
 Route::middleware('auth:sanctum')->get('/user', [AuthController::class, 'getUser']);

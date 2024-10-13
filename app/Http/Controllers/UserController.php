@@ -8,11 +8,12 @@ use Illuminate\Auth\Access\AuthorizationException;
 
 class UserController extends Controller
 {
-    // Phương thức index để lấy danh sách người dùng
+
+
     public function index()
     {
 
-        $users = User::orderBy('username', 'ASC')->paginate(10);
+        $users = User::orderBy('username', 'DESC')->paginate(10);
         return response()->json([
             'data' => $users,
             'success' => true,
@@ -32,42 +33,18 @@ class UserController extends Controller
 
     public function update(Request $request, string $id)
     {
-        try {
-            $user = User::findOrFail($id);
-            $this->authorize('update', $user);
-            $rules = [
-                'first_name' => 'required',
-                'last_name' => 'required',
-                'username' => 'required|unique:users,username,' . $id,
-                'email' => 'required|email|unique:users,email,' . $id,
-            ];
 
-            $messages = [
-                'first_name.required' => 'Họ tên là bắt buộc.',
-                'last_name.required' => 'Tên là bắt buộc.',
-                'username.required' => 'Tên đăng nhập là bắt buộc.',
-                'username.unique' => 'Tên đăng nhập này đã được sử dụng.',
-                'email.required' => 'Email là bắt buộc.',
-                'email.email' => 'Địa chỉ email không hợp lệ.',
-                'email.unique' => 'Email này đã được sử dụng.',
-            ];
+        $user = User::findOrFail($id);
 
-            $request->validate($rules, $messages);
 
-            $user->fill($request->all());
-            $user->save();
+        $user->fill($request->all());
+        $user->save();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Cập nhật thành công',
-                'data' => $user,
-            ]);
-        } catch (AuthorizationException $e) {
-            return response()->json([
-                'message' => 'Bạn không có quyền cập nhật người dùng này.',
-                'success' => false,
-            ], 403);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Cập nhật thành công',
+            'data' => $user,
+        ]);
     }
 
     public function destroy(string $id, Request $request)

@@ -23,20 +23,18 @@ class OrderController extends Controller
             return [
                 'order_id' => $order->id,
                 'total_order' => $totalOrderPrice,
-                'sum_quantity' =>$order->orderDetails->sum('quantity'),
+                'sum_quantity' => $order->orderDetails->sum('quantity'),
                 'order_details' => $order->orderDetails->map(function ($detail) {
                     return [
-                         'id_product' => $detail->product->id,
+                        'id_product' => $detail->product->id,
                         'product_name' => $detail->product->name,
                         'quantity' => $detail->quantity,
                         'image' => $detail->product->image,
                         'unit_price' => $detail->product->price,
                         'total_price' => $detail->quantity * $detail->product->price,
                     ];
-                
-
                 }),
-              
+
             ];
         });
 
@@ -44,10 +42,11 @@ class OrderController extends Controller
         return response()->json($orderList);
     }
 
-    public function deleteProductCart( $order_id, $product_id){
+    public function deleteProductCart($order_id, $product_id)
+    {
         $orderDetail = OrderDetail::where('order_id', $order_id)
-        ->where('product_id', $product_id)
-        ->first();
+            ->where('product_id', $product_id)
+            ->first();
         $orderDetail->delete();
     }
 
@@ -77,18 +76,13 @@ class OrderController extends Controller
     }
     public function userPurchases(Request $request)
     {
-        // Lấy danh sách tất cả người dùng
+
         $users = User::with(['orders.orderDetails.product'])->get();
-
-        // Lấy danh sách đơn hàng đã mua với trạng thái là hoàn thành (status = 1)
         $orders = Order::with(['orderDetails.product', 'user'])->where('status', 1)->get();
-
-        // Tạo danh sách người dùng đã mua hàng
         $userPurchases = $users->map(function ($user) use ($orders) {
-            // Lấy các đơn hàng của người dùng
+
             $userOrders = $orders->where('user_id', $user->id);
 
-            // Tính tổng số lượng sản phẩm mà người dùng đã mua
             $totalQuantity = $userOrders->sum(function ($order) {
                 return $order->orderDetails->sum('quantity');
             });
@@ -103,56 +97,49 @@ class OrderController extends Controller
             return [
                 'username' => $user->username,
                 'email' => $user->email,
-                'total_quantity' => $totalQuantity, // 0 nếu không có đơn hàng
-                'total_value' => $totalValue, // 0 nếu không có đơn hàng
+                'total_quantity' => $totalQuantity,
+                'total_value' => $totalValue,
             ];
         });
 
-        // Kiểm tra xem có yêu cầu lọc ra người dùng không có đơn hàng không
         if ($request->input('exclude_purchased') === 'true') {
             $userPurchases = $userPurchases->filter(function ($user) {
                 return $user['total_quantity'] == 0;
             })->values();
         }
 
-        // Kiểm tra xem có yêu cầu sắp xếp theo số lượng không
         if ($request->input('sort_by_quantity') === 'true') {
             // Sắp xếp danh sách người dùng theo tổng số lượng đã mua giảm dần
             $userPurchases = $userPurchases->sortByDesc('total_quantity')->values();
         }
 
-        // Kiểm tra xem có yêu cầu sắp xếp theo tổng giá trị không
         if ($request->input('sort_by_value') === 'true') {
             // Sắp xếp danh sách người dùng theo tổng giá trị đơn hàng giảm dần
             $userPurchases = $userPurchases->sortByDesc('total_value')->values();
         }
 
-        // Kiểm tra xem có yêu cầu tìm kiếm không
         $search = $request->input('search');
         if ($search) {
-            // Lọc danh sách người dùng theo username hoặc email
             $userPurchases = $userPurchases->filter(function ($user) use ($search) {
                 return str_contains($user['username'], $search) || str_contains($user['email'], $search);
             })->values();
         }
 
-        // Phân trang kết quả
-        $perPage = 10; // Số bản ghi mỗi trang
+
+        $perPage = 10;
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
         $currentItems = $userPurchases->slice(($currentPage - 1) * $perPage, $perPage)->all();
         $userPurchasesPaginated = new LengthAwarePaginator($currentItems, $userPurchases->count(), $perPage, $currentPage, [
             'path' => LengthAwarePaginator::resolveCurrentPath(),
         ]);
 
-        // Kiểm tra xem có người dùng nào không
         if ($userPurchasesPaginated->isEmpty()) {
             return response()->json([
                 'message' => 'Không tìm thấy người dùng nào.',
                 'data' => []
-            ], 404); // Trả về mã trạng thái 404 nếu không tìm thấy
+            ], 404);
         }
 
-        // Trả về danh sách người dùng mua hàng đã xử lý
         return response()->json($userPurchasesPaginated);
     }
 
@@ -163,7 +150,7 @@ class OrderController extends Controller
 
         $user = Auth::user();
         $orders = Order::with(['orderDetails.product'])
-            ->where('status', 1)  // 
+            ->where('status', 1)
             ->where('user_id', $user->id)
             ->get();
 
@@ -205,105 +192,88 @@ class OrderController extends Controller
 
     public function getAllOrders(Request $request)
     {
-        // Bước 1: Lấy các tham số tìm kiếm từ yêu cầu
-        $username = $request->input('username'); // Lấy username từ yêu cầu
-        $email = $request->input('email'); // Lấy email từ yêu cầu
 
-        // Bước 2: Xây dựng truy vấn để lấy danh sách đơn hàng
-        $query = Order::with(['orderDetails.product', 'user']) // Lấy thông tin chi tiết của từng đơn hàng và người đặt
-            ->where('status', 1); // Chỉ lấy các đơn hàng đã được xác nhận
+        $username = $request->input('username');
+        $email = $request->input('email');
 
-        // Bước 3: Nếu có username, thêm điều kiện tìm kiếm theo username
+        $query = Order::with(['orderDetails.product', 'user'])
+            ->where('status', 1);
+
         if ($username) {
             $query->whereHas('user', function ($q) use ($username) {
-                $q->where('username', 'LIKE', '%' . $username . '%'); // Tìm kiếm username
+                $q->where('username', 'LIKE', '%' . $username . '%');
             });
         }
 
-        // Bước 4: Nếu có email, thêm điều kiện tìm kiếm theo email
         if ($email) {
             $query->whereHas('user', function ($q) use ($email) {
-                $q->where('email', 'LIKE', '%' . $email . '%'); // Tìm kiếm email
+                $q->where('email', 'LIKE', '%' . $email . '%');
             });
         }
 
-        // Bước 5: Thực hiện truy vấn và phân trang
-        $orders = $query->paginate(10); // Chia danh sách thành trang, mỗi trang có 10 đơn hàng
+        $orders = $query->paginate(10);
 
-        // Bước 6: Khởi tạo mảng để chứa danh sách đơn hàng
         $orderList = [];
-
-        // Duyệt qua từng đơn hàng
         foreach ($orders as $order) {
-            // Tính tổng giá trị cho mỗi đơn hàng
             $totalOrderPrice = 0;
 
             foreach ($order->orderDetails as $detail) {
-                // Tính tiền cho từng sản phẩm trong đơn hàng
                 $totalOrderPrice += $detail->quantity * $detail->product->price;
             }
-
-            // Thêm thông tin đơn hàng vào mảng
             $orderList[] = [
-                'order_id' => $order->id, // ID của đơn hàng
-                'total_order' => $totalOrderPrice, // Tổng giá trị của đơn hàng
-                'date' => $order->updated_at, // Ngày cập nhật đơn hàng
-                'username' => $order->user->username, // Tên người đặt hàng
-                'email' => $order->user->email, // Email của người đặt hàng
-                'order_details' => [], // Khởi tạo mảng chi tiết đơn hàng
+                'order_id' => $order->id,
+                'total_order' => $totalOrderPrice,
+                'date' => $order->updated_at,
+                'username' => $order->user->username,
+                'email' => $order->user->email,
+                'order_details' => [],
             ];
 
-            // Duyệt qua từng chi tiết đơn hàng
+
             foreach ($order->orderDetails as $detail) {
-                // Thêm thông tin chi tiết sản phẩm vào mảng
+
                 $orderList[count($orderList) - 1]['order_details'][] = [
-                    'product_name' => $detail->product->name, // Tên sản phẩm
-                    'quantity' => $detail->quantity, // Số lượng sản phẩm
-                    'unit_price' => $detail->product->price, // Đơn giá của sản phẩm
-                    'total_price' => $detail->quantity * $detail->product->price, // Tổng giá trị của sản phẩm trong đơn hàng
+                    'product_name' => $detail->product->name,
+                    'quantity' => $detail->quantity,
+                    'unit_price' => $detail->product->price,
+                    'total_price' => $detail->quantity * $detail->product->price,
                 ];
             }
         }
 
-        // Bước 7: Trả về danh sách đơn hàng cùng với thông tin phân trang
         return response()->json([
-            'orders' => $orderList, // Danh sách các đơn hàng
+            'orders' => $orderList,
             'pagination' => [
-                'total' => $orders->total(), // Tổng số đơn hàng
-                'per_page' => $orders->perPage(), // Số đơn hàng hiển thị trên mỗi trang
-                'current_page' => $orders->currentPage(), // Trang hiện tại
-                'last_page' => $orders->lastPage(), // Trang cuối cùng
-                'from' => $orders->firstItem(), // Đơn hàng đầu tiên trong trang hiện tại
-                'to' => $orders->lastItem(), // Đơn hàng cuối cùng trong trang hiện tại
+                'total' => $orders->total(),
+                'per_page' => $orders->perPage(),
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'from' => $orders->firstItem(),
+                'to' => $orders->lastItem(),
             ],
         ]);
     }
 
-    public function updateProductCart(Request $request, $order_id, $product_id) {
+    public function updateProductCart(Request $request, $order_id, $product_id)
+    {
         $quantity = $request->input('quantity');
-    
-        // Tìm OrderDetail theo order_id và product_id
+
         $orderDetail = OrderDetail::where('order_id', $order_id)
-                                    ->where('product_id', $product_id)
-                                    ->first();
-    
-        // Nếu tìm thấy OrderDetail
+            ->where('product_id', $product_id)
+            ->first();
         if ($orderDetail) {
             if ($quantity == 0) {
-                // Nếu số lượng là 0, xóa sản phẩm khỏi giỏ hàng
+
                 $orderDetail->delete();
-                // Kiểm tra xem có còn sản phẩm nào liên kết với order_id này không
                 $remainingOrderDetails = OrderDetail::where('order_id', $order_id)->count();
-    
-                // Nếu không còn sản phẩm nào, xóa luôn Order đó
+
                 if ($remainingOrderDetails == 0) {
                     Order::find($order_id)->delete();
                     return response()->json(['message' => 'Sản phẩm đã được xóa khỏi giỏ hàng và đơn hàng đã bị xóa.'], 200);
                 }
-    
+
                 return response()->json(['message' => 'Sản phẩm đã được xóa khỏi giỏ hàng.'], 200);
             } else {
-                // Cập nhật số lượng sản phẩm
                 $orderDetail->quantity = $quantity;
                 $orderDetail->save();
                 return response()->json(['message' => 'Cập nhật số lượng sản phẩm thành công.'], 200);
@@ -312,5 +282,9 @@ class OrderController extends Controller
             return response()->json(['message' => 'Không tìm thấy sản phẩm trong giỏ hàng.'], 404);
         }
     }
-    
+    public function upe($id, Request $request)
+    {
+
+        echo $request->name;
+    }
 }
