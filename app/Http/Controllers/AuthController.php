@@ -13,13 +13,16 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-
         $email = $request->email;
         $password = $request->password;
 
         $status = Auth::attempt(['email' => $email, 'password' => $password]);
         if ($status) {
-            $token = $request->user()->createToken('auth_token')->plainTextToken;
+            $tokenResult = $request->user()->createToken('auth_token');
+            $token = $tokenResult->plainTextToken;
+            $tokenResult->accessToken->expires_at = now()->addHours(24);   ///now()->addSeconds(10)
+            $tokenResult->accessToken->save();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Đăng nhập thành công',
@@ -27,7 +30,6 @@ class AuthController extends Controller
                 'role_id' => $request->user()->role_id,
                 'user' => $request->user()->email,
                 'id_user' => $request->user()->id,
-
             ]);
         }
 
@@ -36,6 +38,7 @@ class AuthController extends Controller
             'message' => 'Tên đăng nhập hoặc mật khẩu không đúng',
         ], 401);
     }
+
     public function register(Request $request)
     {
         $user = new User();
